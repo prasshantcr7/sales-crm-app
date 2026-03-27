@@ -102,6 +102,55 @@ app.post('/api/leads/:id/email', (req, res) => {
   });
 });
 
+// Send Seminar Invite
+app.post('/api/leads/:id/seminar-invite', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM leads WHERE id = ?', [id], (err, lead) => {
+    if (err || !lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // Google Calendar link for April 1, 2026 | 10:00 AM - 12:00 PM (IST -> UTC is 043000Z/063000Z)
+    const calUrl = "https://calendar.google.com/calendar/r/eventedit?text=Data+Science+%26+AI+Workshop&dates=20260401T043000Z/20260401T063000Z&details=Join+our+Data+Science+and+AI+Awareness+Seminar.&location=IT+Vedant";
+
+    const htmlTemplate = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+        <h2 style="color: #2563eb;">You're Invited: Data Science & AI Workshop!</h2>
+        <p>Hi <strong>${lead.name}</strong>,</p>
+        <p>Thank you for registering. Your seat for our upcoming seminar on <strong>Data Science & AI Awareness</strong> is officially confirmed!</p>
+        
+        <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 0;">📅 <strong>Date:</strong> April 1st, 2026</p>
+          <p style="margin: 5px 0 0 0;">⏰ <strong>Time:</strong> 10:00 AM - 12:00 PM</p>
+        </div>
+
+        <p>Please click the button below to add this event directly to your Google Calendar so you don't miss it!</p>
+        
+        <a href="${calUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">
+          📅 Add to Google Calendar
+        </a>
+
+        <p>Looking forward to seeing you there!</p>
+        <p>Best regards,<br/><strong>Prashant Pradhan</strong><br/>IT Vedant</p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: lead.email,
+      subject: `Seminar Confirmation: Data Science & AI Workshop`,
+      html: htmlTemplate
+    };
+
+    transporter.sendMail(mailOptions, (error) => {
+      if (error) {
+        return res.status(500).json({ error: error.toString() });
+      }
+      db.run('UPDATE leads SET status = ? WHERE id = ?', ['Invite Sent', id], () => {
+        res.json({ success: true, message: 'Invite sent' });
+      });
+    });
+  });
+});
+
 // Get overdue followups
 app.get('/api/tasks/overdue', (req, res) => {
   const now = new Date().toISOString();
