@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config.js';
+import ScheduleModal from './ScheduleModal';
 
 function CollegeActivityTab() {
   const [seminarLeads, setSeminarLeads] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [bulkDate, setBulkDate] = useState('');
+  const [scheduleLead, setScheduleLead] = useState(null);
 
   const fetchLeads = async () => {
     try {
@@ -19,6 +20,13 @@ function CollegeActivityTab() {
   };
 
   useEffect(() => { fetchLeads(); }, []);
+
+  const copyPublicLink = () => {
+    const link = `${window.location.origin}/register`;
+    navigator.clipboard.writeText(link);
+    alert('Public registration link copied! Share this with your college networks.');
+  };
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStudent, setNewStudent] = useState({ name: '', email: '', phone: '' });
 
@@ -47,56 +55,6 @@ function CollegeActivityTab() {
     }
   };
 
-  const sendInvite = async (lead) => {
-    if (lead.status === 'Invite Sent') {
-      if(!window.confirm('Invite already sent to this student! Send again?')) return;
-    }
-    
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/leads/${lead.id}/seminar-invite`, {
-        method: 'POST'
-      });
-      if (res.ok) {
-        alert('Rich email invite with Google Calendar attached has been sent!');
-        fetchLeads();
-      } else {
-        alert('Failed to send invite.');
-      }
-    } catch(err) {
-      console.error(err);
-      alert('Error sending invite.');
-    }
-    setLoading(false);
-  };
-
-  const sendBulkInvite = async (isReschedule) => {
-    if (!bulkDate) return alert('Please select a date and time for the Seminar first!');
-    if (!window.confirm(`Are you sure you want to ${isReschedule ? 'Reschedule' : 'Schedule'} the seminar for ALL students for ${new Date(bulkDate).toLocaleString()}?`)) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/college-activity/schedule-all`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start_date: bulkDate, is_reschedule: isReschedule })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.message);
-        fetchLeads();
-      } else {
-        alert(data.error || 'Failed to send bulk invites.');
-      }
-    } catch(err) {
-      console.error(err);
-      alert('Error sending bulk invites.');
-    }
-    setLoading(false);
-  };
-
-  const hasScheduled = seminarLeads.some(l => l.status === 'Scheduled' || l.status === 'Rescheduled');
-
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div className="flex justify-between items-center">
@@ -104,45 +62,17 @@ function CollegeActivityTab() {
           <h2>College Activity & Seminar Tracking</h2>
           <p style={{ margin: 0, color: 'var(--text-muted)' }}>Data Science & AI Workshop Registration Sync</p>
         </div>
-        <button onClick={() => setShowAddForm(true)} className="btn btn-primary" style={{ padding: '10px 20px', fontWeight: 'bold' }}>
-          ➕ Add Student Manually
-        </button>
-      </div>
-
-      {/* Bulk Scheduling Panel */}
-      <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: 'var(--info)' }}>📅 Mass Event Scheduler</h3>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label className="label">Seminar Date & Time</label>
-            <input 
-              type="datetime-local" 
-              className="input-field" 
-              value={bulkDate} 
-              onChange={e => setBulkDate(e.target.value)} 
-            />
-          </div>
-          <button 
-            className="btn" 
-            style={{ background: '#10b981', color: '#fff', border: 'none', padding: '12px 20px', fontWeight: 'bold' }}
-            onClick={() => sendBulkInvite(false)}
-            disabled={loading || seminarLeads.length === 0}
-          >
-            ✉️ Schedule & Invite All
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={copyPublicLink} className="btn badge-info" style={{ color: '#fff', border: 'none', padding: '10px 20px', fontWeight: 'bold' }}>
+            🔗 Copy Public Registration Link
           </button>
-          
-          {hasScheduled && (
-            <button 
-              className="btn badge-warning" 
-              style={{ color: '#000', border: 'none', padding: '12px 20px', fontWeight: 'bold' }}
-              onClick={() => sendBulkInvite(true)}
-              disabled={loading}
-            >
-              🔄 Reschedule All
-            </button>
-          )}
+          <button onClick={() => setShowAddForm(true)} className="btn btn-primary" style={{ padding: '10px 20px', fontWeight: 'bold' }}>
+            ➕ Add Student
+          </button>
         </div>
       </div>
+
+
 
       {showAddForm && (
         <div className="glass-panel animate-fade-in" style={{ padding: '1.5rem', marginBottom: '1rem', border: '1px solid var(--primary)' }}>
@@ -200,12 +130,11 @@ function CollegeActivityTab() {
                 </td>
                 <td style={{ padding: '12px' }}>
                   <button 
-                    disabled={loading}
                     className="btn btn-primary" 
                     style={{ padding: '6px 14px', fontSize: '0.85rem' }} 
-                    onClick={() => sendInvite(lead)}
+                    onClick={() => setScheduleLead(lead)}
                   >
-                    Send Official E-Invite & Calendar
+                    Schedule Meet
                   </button>
                 </td>
               </tr>
@@ -220,6 +149,17 @@ function CollegeActivityTab() {
           </tbody>
         </table>
       </div>
+
+      {scheduleLead && (
+        <ScheduleModal 
+          lead={scheduleLead} 
+          onClose={() => setScheduleLead(null)}
+          onSchedule={() => {
+            setScheduleLead(null);
+            fetchLeads();
+          }}
+        />
+      )}
     </div>
   );
 }
