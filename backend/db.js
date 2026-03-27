@@ -72,6 +72,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         month TEXT PRIMARY KEY,
         target_amount REAL NOT NULL
       )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS analytics (
+        page_name TEXT PRIMARY KEY,
+        view_count INTEGER DEFAULT 0
+      )`, (err) => {
+        if (!err) {
+          db.run(`INSERT OR IGNORE INTO analytics (page_name, view_count) VALUES ('register', 0)`);
+        }
+      });
     });
   }
 });

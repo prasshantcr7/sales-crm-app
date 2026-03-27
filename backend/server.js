@@ -451,6 +451,36 @@ app.patch('/api/customers/:id/emi', (req, res) => {
     res.json({ updated: this.changes });
   });
 });
+// Delete a Lead
+app.delete('/api/leads/:id', (req, res) => {
+  db.run('DELETE FROM leads WHERE id = ?', [req.params.id], function(err) {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ deleted: this.changes });
+  });
+});
+
+// Increment Page View for Analytics
+app.post('/api/analytics/view', (req, res) => {
+  const { page } = req.body;
+  if (!page) return res.status(400).json({ error: 'Page required' });
+  db.run(`UPDATE analytics SET view_count = view_count + 1 WHERE page_name = ?`, [page], function(err) {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Get Analytics Stats
+app.get('/api/analytics', (req, res) => {
+  db.get(`SELECT view_count FROM analytics WHERE page_name = 'register'`, [], (err, row) => {
+    const views = row ? row.view_count : 0;
+    db.get(`SELECT COUNT(*) as count FROM leads WHERE program = 'AI Workshop Seminar'`, (err2, countRow) => {
+      res.json({
+        register_views: views,
+        registered_students: countRow ? countRow.count : 0
+      });
+    });
+  });
+});
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

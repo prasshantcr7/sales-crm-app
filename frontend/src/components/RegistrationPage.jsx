@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config.js';
 
 function RegistrationPage() {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(false);
 
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/analytics/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: 'register' })
+    }).catch(e => console.error(e));
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true); // Set loading to true when submitting
+    setError(false); // Clear previous errors
     try {
       const res = await fetch(`${API_BASE_URL}/api/leads`, {
         method: 'POST',

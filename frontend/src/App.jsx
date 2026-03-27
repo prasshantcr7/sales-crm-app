@@ -9,6 +9,7 @@ import DashboardTab from './components/DashboardTab';
 import LinkedInTab from './components/LinkedInTab';
 import CollegeActivityTab from './components/CollegeActivityTab';
 import RegistrationPage from './components/RegistrationPage';
+import AnalyticsTab from './components/AnalyticsTab';
 
 function App() {
   const [showForm, setShowForm] = useState(false);
@@ -115,13 +116,14 @@ function App() {
       </header>
 
       <main className="container">
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '2rem', flexWrap: 'wrap' }}>
-          <TabButton id="leads" label="Leads" />
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
+          <TabButton id="leads" label="Leads Pipeline" />
           <TabButton id="customers" label="Customers" />
-          <TabButton id="payments" label="Payments" />
-          <TabButton id="linkedin" label="LinkedIn Leads" />
-          <TabButton id="college" label="College Activity" />
+          <TabButton id="payments" label="Payments Tracking" />
           <TabButton id="dashboard" label="Sales Dashboard" />
+          <TabButton id="linkedin" label="LinkedIn Sync" />
+          <TabButton id="college" label="College Activity" />
+          <TabButton id="analytics" label="Link Analytics" />
         </div>
 
         {activeTab === 'leads' && (
@@ -137,6 +139,7 @@ function App() {
         {activeTab === 'linkedin' && <LinkedInTab />}
         {activeTab === 'college' && <CollegeActivityTab />}
         {activeTab === 'dashboard' && <DashboardTab />}
+        {activeTab === 'analytics' && <AnalyticsTab />}
       </main>
 
       {showForm && (

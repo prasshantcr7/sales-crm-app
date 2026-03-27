@@ -42,7 +42,27 @@ function LeadCard({ lead, onUpdate }) {
           <h3 style={{ margin: 0 }}>{lead.name}</h3>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{lead.program}</span>
         </div>
-        <span className={`badge ${statusColor}`}>{lead.status}</span>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <span className={`badge ${statusColor}`}>{lead.status}</span>
+          <button 
+            onClick={async () => {
+              if(!window.confirm('Delete this lead permanently?')) return;
+              try {
+                await fetch(`${API_BASE_URL}/api/leads/${lead.id}`, { method: 'DELETE' });
+                if (onUpdate) onUpdate();
+              } catch(e) {
+                console.error(e);
+              }
+            }}
+            style={{ 
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: '1.2rem', padding: '0 5px', color: 'var(--text-muted)'
+            }}
+            title="Delete Lead"
+          >
+            🗑️
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
