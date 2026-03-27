@@ -9,6 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Configure Nodemailer transporter
+// Personal Email Transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -16,6 +17,18 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   }
 });
+
+// Office Email Transporter
+const officeTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.OFFICE_EMAIL_USER || process.env.EMAIL_USER, // fallback to personal if not set yet
+    pass: process.env.OFFICE_EMAIL_PASS || process.env.EMAIL_PASS
+  }
+});
+
+const getTransporter = (sender) => sender === 'office' ? officeTransporter : transporter;
+const getSenderEmail = (sender) => sender === 'office' ? (process.env.OFFICE_EMAIL_USER || process.env.EMAIL_USER) : process.env.EMAIL_USER;
 
 // ... Keep existing endpoints ...
 
@@ -67,6 +80,7 @@ app.patch('/api/leads/:id', (req, res) => {
 // Send custom email
 app.post('/api/leads/:id/email', (req, res) => {
   const { id } = req.params;
+  const { sender } = req.body || {};
   db.get('SELECT * FROM leads WHERE id = ?', [id], (err, lead) => {
     if (err || !lead) {
       return res.status(404).json({ error: 'Lead not found' });
@@ -83,13 +97,13 @@ app.post('/api/leads/:id/email', (req, res) => {
     `;
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: getSenderEmail(sender),
       to: lead.email,
       subject: `Follow-up regarding ${lead.program} at IT Vedant`,
       html: htmlTemplate
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
+    getTransporter(sender).sendMail(mailOptions, (error, info) => {
       if (error) {
         console.error('Error sending email:', error);
         return res.status(500).json({ error: error.toString() });
@@ -105,6 +119,7 @@ app.post('/api/leads/:id/email', (req, res) => {
 // Send Seminar Invite
 app.post('/api/leads/:id/seminar-invite', (req, res) => {
   const { id } = req.params;
+  const { sender } = req.body || {};
   db.get('SELECT * FROM leads WHERE id = ?', [id], (err, lead) => {
     if (err || !lead) return res.status(404).json({ error: 'Lead not found' });
 
@@ -134,13 +149,13 @@ app.post('/api/leads/:id/seminar-invite', (req, res) => {
     `;
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: getSenderEmail(sender),
       to: lead.email,
       subject: `Seminar Confirmation: Data Science & AI Workshop`,
       html: htmlTemplate
     };
 
-    transporter.sendMail(mailOptions, (error) => {
+    getTransporter(sender).sendMail(mailOptions, (error) => {
       if (error) {
         return res.status(500).json({ error: error.toString() });
       }
@@ -153,7 +168,7 @@ app.post('/api/leads/:id/seminar-invite', (req, res) => {
 
 // Bulk Schedule / Reschedule All Seminar Leads
 app.post('/api/college-activity/schedule-all', (req, res) => {
-  const { start_date, is_reschedule } = req.body;
+  const { start_date, is_reschedule, sender } = req.body;
   if (!start_date) return res.status(400).json({ error: 'Start date is required' });
 
   // Compute end date (2 hours later)
@@ -200,13 +215,13 @@ app.post('/api/college-activity/schedule-all', (req, res) => {
       `;
 
       const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: getSenderEmail(sender),
         to: lead.email,
         subject: is_reschedule ? `Rescheduled: Data Science & AI Workshop` : `Seminar Confirmation: Data Science & AI Workshop`,
         html: htmlTemplate
       };
 
-      transporter.sendMail(mailOptions, (error) => {
+      getTransporter(sender).sendMail(mailOptions, (error) => {
         if (!error) {
           successCount++;
           db.run('UPDATE leads SET status = ? WHERE id = ?', [is_reschedule ? 'Rescheduled' : 'Scheduled', lead.id]);

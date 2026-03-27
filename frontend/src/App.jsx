@@ -17,6 +17,13 @@ function App() {
   const [activeTab, setActiveTab] = useState('leads');
   const [isPublicRoute, setIsPublicRoute] = useState(window.location.pathname === '/register');
 
+  const [emailSender, setEmailSender] = useState(localStorage.getItem('email_sender') || 'personal');
+  const handleSenderChange = (e) => {
+    const val = e.target.value;
+    setEmailSender(val);
+    localStorage.setItem('email_sender', val);
+  };
+
   useEffect(() => {
     // Handle manual URL changes for the public route
     const handleLocationChange = () => {
@@ -81,16 +88,29 @@ function App() {
   return (
     <div className="app-container">
       <header>
-        <div className="container header-content">
-          <h1 className="logo">
+        <div className="container header-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 className="logo" style={{ margin: 0 }}>
             <div className="logo-icon">C</div>
             Sales Assistant
           </h1>
-          {activeTab === 'leads' && (
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-              + New Lead
-            </button>
-          )}
+          
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <select 
+              value={emailSender} 
+              onChange={handleSenderChange} 
+              className="input-field" 
+              style={{ padding: '8px 12px', fontSize: '0.85rem', cursor: 'pointer', background: 'var(--bg-card)', minWidth: '150px' }}
+            >
+              <option value="personal">📩 Send as Personal</option>
+              <option value="office">🏢 Send as Office</option>
+            </select>
+            
+            {activeTab === 'leads' && (
+              <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+                + New Lead
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

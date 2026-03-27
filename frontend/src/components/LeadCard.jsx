@@ -20,7 +20,12 @@ function LeadCard({ lead, onUpdate }) {
   const handleSendEmail = async () => {
     setIsSending(true);
     try {
-      await fetch(`${API_BASE_URL}/api/leads/${lead.id}/email`, { method: 'POST' });
+      const sender = localStorage.getItem('email_sender') || 'personal';
+      await fetch(`${API_BASE_URL}/api/leads/${lead.id}/email`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender })
+      });
       if (onUpdate) onUpdate();
     } catch (e) {
       console.error(e);

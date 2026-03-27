@@ -27,6 +27,30 @@ function CollegeActivityTab() {
     alert('Public registration link copied! Share this with your college networks.');
   };
 
+  const exportToCSV = () => {
+    if (seminarLeads.length === 0) return alert("No data to export!");
+    
+    const headers = ['Student Name', 'Email Address', 'Phone', 'Access Status'];
+    const rows = seminarLeads.map(lead => [
+      `"${lead.name}"`, 
+      `"${lead.email}"`, 
+      `"${lead.phone}"`, 
+      `"${lead.status}"`
+    ]);
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n" 
+      + rows.map(e => e.join(",")).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "seminar_students.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStudent, setNewStudent] = useState({ name: '', email: '', phone: '' });
 
@@ -99,7 +123,12 @@ function CollegeActivityTab() {
       )}
 
       <div className="glass-panel" style={{ padding: '1.5rem', overflowX: 'auto' }}>
-        <h3 style={{ marginBottom: '1.5rem' }}>Registered Students ({seminarLeads.length})</h3>
+        <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ margin: 0 }}>Registered Students ({seminarLeads.length})</h3>
+          <button onClick={exportToCSV} className="btn badge-success" style={{ color: '#fff', border: 'none', padding: '8px 15px', fontWeight: 'bold' }}>
+            📥 Export to Google Sheets (CSV)
+          </button>
+        </div>
 
         {loading && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>Sending invite... please wait.</div>}
 
