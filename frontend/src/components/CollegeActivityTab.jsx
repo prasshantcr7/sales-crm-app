@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config.js';
 function CollegeActivityTab() {
   const [seminarLeads, setSeminarLeads] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [bulkDate, setBulkDate] = useState('');
 
   const fetchLeads = async () => {
     try {
@@ -18,12 +19,32 @@ function CollegeActivityTab() {
   };
 
   useEffect(() => { fetchLeads(); }, []);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newStudent, setNewStudent] = useState({ name: '', email: '', phone: '' });
 
-  const copyPublicLink = () => {
-    // Determine the base origin of the frontend to build the public link
-    const link = `${window.location.origin}/register`;
-    navigator.clipboard.writeText(link);
-    alert('Public registration link copied! Share this with your college networks.');
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newStudent.name,
+          email: newStudent.email,
+          phone: newStudent.phone,
+          program: 'AI Workshop Seminar',
+          status: 'Pending Invite'
+        })
+      });
+      if (res.ok) {
+        setNewStudent({ name: '', email: '', phone: '' });
+        setShowAddForm(false);
+        fetchLeads();
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error adding student manually');
+    }
   };
 
   const sendInvite = async (lead) => {
@@ -49,17 +70,103 @@ function CollegeActivityTab() {
     setLoading(false);
   };
 
+  const sendBulkInvite = async (isReschedule) => {
+    if (!bulkDate) return alert('Please select a date and time for the Seminar first!');
+    if (!window.confirm(`Are you sure you want to ${isReschedule ? 'Reschedule' : 'Schedule'} the seminar for ALL students for ${new Date(bulkDate).toLocaleString()}?`)) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/college-activity/schedule-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_date: bulkDate, is_reschedule: isReschedule })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        fetchLeads();
+      } else {
+        alert(data.error || 'Failed to send bulk invites.');
+      }
+    } catch(err) {
+      console.error(err);
+      alert('Error sending bulk invites.');
+    }
+    setLoading(false);
+  };
+
+  const hasScheduled = seminarLeads.some(l => l.status === 'Scheduled' || l.status === 'Rescheduled');
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div className="flex justify-between items-center">
         <div>
           <h2>College Activity & Seminar Tracking</h2>
-          <p style={{ margin: 0, color: 'var(--text-muted)' }}>April 1st: Data Science & AI Workshop Registration Sync</p>
+          <p style={{ margin: 0, color: 'var(--text-muted)' }}>Data Science & AI Workshop Registration Sync</p>
         </div>
-        <button onClick={copyPublicLink} className="btn badge-info" style={{ color: '#fff', border: 'none', padding: '10px 20px', fontWeight: 'bold' }}>
-          🔗 Copy Public Registration Link
+        <button onClick={() => setShowAddForm(true)} className="btn btn-primary" style={{ padding: '10px 20px', fontWeight: 'bold' }}>
+          ➕ Add Student Manually
         </button>
       </div>
+
+      {/* Bulk Scheduling Panel */}
+      <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+        <h3 style={{ margin: '0 0 1rem 0', color: 'var(--info)' }}>📅 Mass Event Scheduler</h3>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label className="label">Seminar Date & Time</label>
+            <input 
+              type="datetime-local" 
+              className="input-field" 
+              value={bulkDate} 
+              onChange={e => setBulkDate(e.target.value)} 
+            />
+          </div>
+          <button 
+            className="btn" 
+            style={{ background: '#10b981', color: '#fff', border: 'none', padding: '12px 20px', fontWeight: 'bold' }}
+            onClick={() => sendBulkInvite(false)}
+            disabled={loading || seminarLeads.length === 0}
+          >
+            ✉️ Schedule & Invite All
+          </button>
+          
+          {hasScheduled && (
+            <button 
+              className="btn badge-warning" 
+              style={{ color: '#000', border: 'none', padding: '12px 20px', fontWeight: 'bold' }}
+              onClick={() => sendBulkInvite(true)}
+              disabled={loading}
+            >
+              🔄 Reschedule All
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showAddForm && (
+        <div className="glass-panel animate-fade-in" style={{ padding: '1.5rem', marginBottom: '1rem', border: '1px solid var(--primary)' }}>
+          <h3 style={{ margin: '0 0 1rem 0' }}>Add Student to Seminar</h3>
+          <form onSubmit={handleAddStudent} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+            <div>
+              <label className="label">Name</label>
+              <input type="text" className="input-field" required value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} />
+            </div>
+            <div>
+              <label className="label">Email</label>
+              <input type="email" className="input-field" required value={newStudent.email} onChange={e => setNewStudent({...newStudent, email: e.target.value})} />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input type="text" className="input-field" required value={newStudent.phone} onChange={e => setNewStudent({...newStudent, phone: e.target.value})} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" className="btn btn-primary">Save Student</button>
+              <button type="button" className="btn" onClick={() => setShowAddForm(false)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="glass-panel" style={{ padding: '1.5rem', overflowX: 'auto' }}>
         <h3 style={{ marginBottom: '1.5rem' }}>Registered Students ({seminarLeads.length})</h3>
@@ -106,7 +213,7 @@ function CollegeActivityTab() {
             {seminarLeads.length === 0 && (
               <tr>
                 <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No students have registered using the public link yet.
+                  No students added manually to this seminar yet.
                 </td>
               </tr>
             )}

@@ -151,6 +151,78 @@ app.post('/api/leads/:id/seminar-invite', (req, res) => {
   });
 });
 
+// Bulk Schedule / Reschedule All Seminar Leads
+app.post('/api/college-activity/schedule-all', (req, res) => {
+  const { start_date, is_reschedule } = req.body;
+  if (!start_date) return res.status(400).json({ error: 'Start date is required' });
+
+  // Compute end date (2 hours later)
+  const startDateObj = new Date(start_date);
+  const endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
+  
+  const formatGoogleDate = (d) => d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+  const startStr = formatGoogleDate(startDateObj);
+  const endStr = formatGoogleDate(endDateObj);
+
+  const calUrl = `https://calendar.google.com/calendar/r/eventedit?text=Data+Science+%26+AI+Workshop&dates=${startStr}/${endStr}&details=Join+our+Data+Science+and+AI+Awareness+Seminar.&location=IT+Vedant`;
+
+  const dateDisplay = startDateObj.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  db.all('SELECT * FROM leads WHERE program = "AI Workshop Seminar"', [], (err, leads) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!leads || leads.length === 0) return res.status(400).json({ error: 'No students found.' });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    leads.forEach(lead => {
+      const htmlTemplate = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #2563eb;">${is_reschedule ? 'Update: Workshop Rescheduled!' : "You're Invited: Data Science & AI Workshop!"}</h2>
+          <p>Hi <strong>${lead.name}</strong>,</p>
+          <p>${is_reschedule 
+            ? 'Our upcoming seminar has been explicitly rescheduled. Please note the new date and time and update your calendar!' 
+            : 'Thank you for registering. Your seat for our upcoming seminar on <strong>Data Science & AI Awareness</strong> is officially confirmed!'}</p>
+          
+          <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 16px;">📅 <strong>Date & Time:</strong> ${dateDisplay}</p>
+          </div>
+
+          <p>Please click the button below to add this event directly to your Google Calendar so you don't miss it!</p>
+          
+          <a href="${calUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">
+            📅 ${is_reschedule ? 'Update Google Calendar' : 'Add to Google Calendar'}
+          </a>
+
+          <p>Looking forward to seeing you there!</p>
+          <p>Best regards,<br/><strong>Prashant Pradhan</strong><br/>IT Vedant</p>
+        </div>
+      `;
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: lead.email,
+        subject: is_reschedule ? `Rescheduled: Data Science & AI Workshop` : `Seminar Confirmation: Data Science & AI Workshop`,
+        html: htmlTemplate
+      };
+
+      transporter.sendMail(mailOptions, (error) => {
+        if (!error) {
+          successCount++;
+          db.run('UPDATE leads SET status = ? WHERE id = ?', [is_reschedule ? 'Rescheduled' : 'Scheduled', lead.id]);
+        } else {
+          failCount++;
+        }
+        
+        // Wait till all emails are processed
+        if (successCount + failCount === leads.length) {
+          res.json({ success: true, message: `Sent ${successCount} emails. Failed: ${failCount}` });
+        }
+      });
+    });
+  });
+});
+
 // Get overdue followups
 app.get('/api/tasks/overdue', (req, res) => {
   const now = new Date().toISOString();
