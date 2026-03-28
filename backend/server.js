@@ -45,19 +45,68 @@ app.get('/api/leads', (req, res) => {
 
 // Add new lead
 app.post('/api/leads', (req, res) => {
-  const { name, email, phone, program } = req.body;
+  const { name, email, phone, program, status } = req.body;
+  const insertStatus = status || 'In Progress';
 
   // Default follow-up in 1 hour if not specified
   const nextFollowUp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-  db.run(`INSERT INTO leads (name, email, phone, program, nextFollowUp) VALUES (?, ?, ?, ?, ?)`,
-    [name, email, phone, program, nextFollowUp],
+  db.run(`INSERT INTO leads (name, email, phone, program, status, nextFollowUp) VALUES (?, ?, ?, ?, ?, ?)`,
+    [name, email, phone, program, insertStatus, nextFollowUp],
     function (err) {
       if (err) {
         res.status(400).json({ error: err.message });
         return;
       }
-      res.json({ id: this.lastID, name, email, phone, program, status: 'In Progress', nextFollowUp });
+      const leadId = this.lastID;
+
+      // Send registration email if it's the AI Workshop Seminar
+      if (program === 'AI Workshop Seminar' || program === 'AI Workshop Webinar') {
+        const htmlTemplate = `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <p>Dear <strong>${name}</strong>,</p>
+            <p>Thank you for registering for our upcoming AI Workshop Webinar! We’re excited to have you join us on this learning journey.</p>
+            
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+              <p style="margin: 0;">📅 <strong>Date:</strong> 1/04/2026</p>
+              <p style="margin: 5px 0 0 0;">⏰ <strong>Time:</strong> 10:00</p>
+              <p style="margin: 5px 0 0 0;">🔗 <strong>Join Link:</strong> <a href="https://meet.google.com/ahn-zssf-qxu">meet.google.com/ahn-zssf-qxu</a></p>
+            </div>
+
+            <p>In this session, you will:</p>
+            <ul>
+              <li>Gain insights into the fundamentals of Artificial Intelligence</li>
+              <li>Explore real-world applications and industry trends</li>
+              <li>Understand how AI can enhance your career opportunities</li>
+            </ul>
+
+            <p><strong>What to do next:</strong></p>
+            <ul>
+              <li>Mark your calendar so you don’t miss out</li>
+              <li>Join 5–10 minutes early to ensure a smooth start</li>
+              <li>Keep your questions ready for an interactive session</li>
+            </ul>
+
+            <p>If you have any queries, feel free to reach out to us.</p>
+            <p>We look forward to seeing you there!</p>
+          </div>
+        `;
+
+        const mailOptions = {
+          from: getSenderEmail('office'),
+          to: email,
+          subject: 'Registration Confirmed: AI Workshop Webinar',
+          html: htmlTemplate
+        };
+
+        getTransporter('office').sendMail(mailOptions, (error) => {
+          if (error) {
+             console.error('Failed to send registration email to', email, error);
+          }
+        });
+      }
+
+      res.json({ id: leadId, name, email, phone, program, status: insertStatus, nextFollowUp });
     });
 });
 
