@@ -149,15 +149,44 @@ function CollegeActivityTab() {
                 <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{lead.email}</td>
                 <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{lead.phone}</td>
                 <td style={{ padding: '12px' }}>
-                  <span className="badge" style={{ 
-                    backgroundColor: lead.status === 'Invite Sent' ? '#10b981' : 'var(--warning)', 
-                    color: lead.status === 'Invite Sent' ? '#fff' : '#000', 
-                    border: 'none' 
-                  }}>
-                    {lead.status === 'Invite Sent' ? 'Invite Sent ✅' : 'Pending Invite'}
+                  <span 
+                    className="badge" 
+                    style={{ 
+                      backgroundColor: lead.status === 'Invite Sent' ? '#10b981' : 'var(--warning)', 
+                      color: lead.status === 'Invite Sent' ? '#fff' : '#000', 
+                      border: 'none'
+                    }}
+                  >
+                    {lead.status === 'Invite Sent' ? 'Invite Sent ✅' : 'PENDING INVITE'}
                   </span>
                 </td>
-                <td style={{ padding: '12px' }}>
+                <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+                  {lead.status !== 'Invite Sent' && (
+                    <button
+                      className="btn badge-info"
+                      style={{ padding: '6px 14px', fontSize: '0.85rem', color: '#fff', border: 'none' }}
+                      onClick={async () => {
+                        if (!window.confirm(`Send seminar invitation email to ${lead.name}?`)) return;
+                        try {
+                          setLoading(true);
+                          const res = await fetch(`${API_BASE_URL}/api/leads/${lead.id}/seminar-invite`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sender: 'office' })
+                          });
+                          if (!res.ok) throw new Error('Failed');
+                          fetchLeads();
+                        } catch (err) {
+                          console.error(err);
+                          alert('Failed to send invite.');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                    >
+                      Send Invite
+                    </button>
+                  )}
                   <button 
                     className="btn btn-primary" 
                     style={{ padding: '6px 14px', fontSize: '0.85rem' }} 
