@@ -17,6 +17,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     db.serialize(() => {
       db.run(`CREATE TABLE IF NOT EXISTS leads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inquiry_id TEXT,
         name TEXT NOT NULL,
         email TEXT NOT NULL,
         phone TEXT NOT NULL,
@@ -27,6 +28,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`, (err) => {
         if (!err) {
           db.run(`ALTER TABLE leads ADD COLUMN emailSentAt TEXT`, () => {});
+          db.run(`ALTER TABLE leads ADD COLUMN inquiry_id TEXT`, () => {});
         }
       });
 
@@ -79,6 +81,23 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`, (err) => {
         if (!err) {
           db.run(`INSERT OR IGNORE INTO analytics (page_name, view_count) VALUES ('register', 0)`);
+        }
+      });
+
+      db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        phone TEXT UNIQUE,
+        password TEXT,
+        name TEXT,
+        picture TEXT,
+        role TEXT DEFAULT 'user',
+        created_at TEXT
+      )`, (err) => {
+        // If the table already exists, try adding the columns
+        if (!err) {
+          db.run(`ALTER TABLE users ADD COLUMN phone TEXT UNIQUE`, () => {});
+          db.run(`ALTER TABLE users ADD COLUMN password TEXT`, () => {});
         }
       });
     });

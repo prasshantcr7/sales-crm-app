@@ -10,6 +10,9 @@ import LinkedInTab from './components/LinkedInTab';
 import CollegeActivityTab from './components/CollegeActivityTab';
 import RegistrationPage from './components/RegistrationPage';
 import AnalyticsTab from './components/AnalyticsTab';
+import Login from './components/Login';
+import ProfileTab from './components/ProfileTab';
+import BulkAddTab from './components/BulkAddTab';
 
 function App() {
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +20,21 @@ function App() {
   const [overdue, setOverdue] = useState([]);
   const [activeTab, setActiveTab] = useState('leads');
   const [isPublicRoute, setIsPublicRoute] = useState(window.location.pathname === '/register');
+
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('crm_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    localStorage.setItem('crm_user', JSON.stringify(userData));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('crm_user');
+  };
 
   const [emailSender, setEmailSender] = useState(localStorage.getItem('email_sender') || 'personal');
   const handleSenderChange = (e) => {
@@ -86,6 +104,10 @@ function App() {
     return <RegistrationPage />;
   }
 
+  if (!user) {
+    return <Login onLoginSuccess={handleLogin} />;
+  }
+
   return (
     <div className="app-container">
       <header>
@@ -124,6 +146,8 @@ function App() {
           <TabButton id="linkedin" label="LinkedIn Sync" />
           <TabButton id="college" label="College Activity" />
           <TabButton id="analytics" label="Link Analytics" />
+          <TabButton id="bulkAdd" label="Bulk Add" />
+          <TabButton id="profile" label="My Profile" />
         </div>
 
         {activeTab === 'leads' && (
@@ -140,6 +164,8 @@ function App() {
         {activeTab === 'college' && <CollegeActivityTab />}
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'analytics' && <AnalyticsTab />}
+        {activeTab === 'bulkAdd' && <BulkAddTab onLeadsAdded={fetchLeads} />}
+        {activeTab === 'profile' && <ProfileTab user={user} onLogout={handleLogout} />}
       </main>
 
       {showForm && (

@@ -32,6 +32,113 @@ const getSenderEmail = (sender) => sender === 'office' ? (process.env.OFFICE_EMA
 
 // ... Keep existing endpoints ...
 
+// Get or Create User via Google Login
+app.post('/api/auth/google', (req, res) => {
+  const { email, name, picture } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    if (user) {
+      // User exists, just update their name and picture if they changed
+      db.run('UPDATE users SET name = ?, picture = ? WHERE email = ?', [name, picture, email], () => {
+        user.name = name;
+        user.picture = picture;
+        return res.json({ user });
+      });
+    } else {
+      // Create new user
+      const created_at = new Date().toISOString();
+      db.run('INSERT INTO users (email, name, picture, role, created_at) VALUES (?, ?, ?, ?, ?)', 
+        [email, name, picture, 'user', created_at], 
+        function(err2) {
+          if (err2) return res.status(500).json({ error: err2.message });
+          res.json({ 
+            user: {
+              id: this.lastID,
+              email,
+              name,
+              picture,
+              role: 'user',
+              created_at
+            }
+          });
+      });
+    }
+  });
+});
+
+const bcrypt = require('bcryptjs');
+
+// Register User
+app.post('/api/auth/register', async (req, res) => {
+  const { identifier, password, name } = req.body;
+  if (!identifier || !password) return res.status(400).json({ error: 'Identifier and password required' });
+
+  let email = null;
+  let phone = null;
+  if (identifier.includes('@')) {
+    email = identifier;
+  } else {
+    phone = identifier;
+    email = `${phone}@placeholder.com`; // To satisfy NOT NULL constraints if they exist
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const created_at = new Date().toISOString();
+
+  // Check if exists
+  db.get('SELECT * FROM users WHERE email = ? OR (phone = ? AND phone IS NOT NULL)', [email, phone], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (user) return res.status(400).json({ error: 'User already exists' });
+
+    db.run('INSERT INTO users (email, phone, password, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [email, phone, hashedPassword, name || '', 'user', created_at],
+      function(err2) {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({
+          user: {
+            id: this.lastID,
+            email: email.includes('@placeholder.com') ? null : email,
+            phone,
+            name,
+            role: 'user'
+          }
+        });
+      }
+    );
+  });
+});
+
+// Login User
+app.post('/api/auth/login', (req, res) => {
+  const { identifier, password } = req.body;
+  if (!identifier || !password) return res.status(400).json({ error: 'Identifier and password required' });
+
+  let query = 'SELECT * FROM users WHERE email = ?';
+  if (!identifier.includes('@')) {
+    query = 'SELECT * FROM users WHERE phone = ?';
+  }
+
+  db.get(query, [identifier], async (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user || (!user.password && !user.email.includes('@placeholder.com'))) {
+      return res.status(400).json({ error: 'Invalid credentials or user logs in with Google' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) return res.status(400).json({ error: 'Invalid credentials' });
+
+    // Remove password from response
+    delete user.password;
+    if (user.email && user.email.includes('@placeholder.com')) user.email = null;
+
+    res.json({ user });
+  });
+});
 // Get all leads
 app.get('/api/leads', (req, res) => {
   db.all('SELECT * FROM leads ORDER BY nextFollowUp ASC', [], (err, rows) => {
@@ -45,14 +152,14 @@ app.get('/api/leads', (req, res) => {
 
 // Add new lead
 app.post('/api/leads', (req, res) => {
-  const { name, email, phone, program, status } = req.body;
+  const { inquiry_id, name, email, phone, program, status } = req.body;
   const insertStatus = status || 'In Progress';
 
   // Default follow-up in 1 hour if not specified
   const nextFollowUp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-  db.run(`INSERT INTO leads (name, email, phone, program, status, nextFollowUp) VALUES (?, ?, ?, ?, ?, ?)`,
-    [name, email, phone, program, insertStatus, nextFollowUp],
+  db.run(`INSERT INTO leads (inquiry_id, name, email, phone, program, status, nextFollowUp) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [inquiry_id || null, name, email, phone, program, insertStatus, nextFollowUp],
     function (err) {
       if (err) {
         res.status(400).json({ error: err.message });
@@ -106,8 +213,51 @@ app.post('/api/leads', (req, res) => {
         });
       }
 
-      res.json({ id: leadId, name, email, phone, program, status: insertStatus, nextFollowUp });
+      res.json({ id: leadId, inquiry_id, name, email, phone, program, status: insertStatus, nextFollowUp });
     });
+});
+
+// Bulk Insert Leads
+app.post('/api/leads/bulk', (req, res) => {
+  const { leads } = req.body;
+  if (!leads || !Array.isArray(leads)) {
+    return res.status(400).json({ error: 'Expected an array of leads' });
+  }
+
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+    
+    let errorOccurred = false;
+    let completedCount = 0;
+
+    const stmt = db.prepare(`INSERT INTO leads (inquiry_id, name, email, phone, program, status, nextFollowUp) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+    leads.forEach(lead => {
+      const { inquiry_id, name, email, phone, program, status } = lead;
+      const insertStatus = status || 'In Progress';
+      const nextFollowUp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+      stmt.run([inquiry_id || null, name, email, phone, program || 'Unknown', insertStatus, nextFollowUp], (err) => {
+        if (err && !errorOccurred) {
+          errorOccurred = true;
+          db.run('ROLLBACK', () => {
+            res.status(500).json({ error: err.message });
+          });
+        }
+        completedCount++;
+        if (completedCount === leads.length && !errorOccurred) {
+          stmt.finalize();
+          db.run('COMMIT', () => {
+            res.json({ success: true, count: leads.length });
+          });
+        }
+      });
+    });
+
+    if (leads.length === 0) {
+       db.run('COMMIT', () => { res.json({ success: true, count: 0 }); });
+    }
+  });
 });
 
 // Update lead status

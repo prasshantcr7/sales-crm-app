@@ -39,7 +39,10 @@ function LeadCard({ lead, onUpdate }) {
     <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '15px' }}>
       <div className="flex justify-between items-center">
         <div>
-          <h3 style={{ margin: 0 }}>{lead.name}</h3>
+          <h3 style={{ margin: 0 }}>
+            {lead.name}
+            {lead.inquiry_id && <span style={{ marginLeft: '10px', fontSize: '0.8rem', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>#{lead.inquiry_id}</span>}
+          </h3>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{lead.program}</span>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
